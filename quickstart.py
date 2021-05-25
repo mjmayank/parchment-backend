@@ -15,57 +15,41 @@ def translate_to_doc(item):
     newline = '\n'
     checkbox = '[ ]'
     if item['type'] == 'check':
-        return [{
-            'insertText': {
-                'location': {
-                    'index': 1,
-                },
-                'text': checkbox + ' ' + item['text'] + newline
-            }
-        }]
-    elif item['type'] == 'h1' or item['type'] == 'h2':
-        formatting = [
-            {
-                'bold': True,
-                'fontSize': {
-                    'magnitude': 16,
-                    'unit': 'PT',
-                },
-                'weightedFontFamily': {
-                    'fontFamily': 'Roboto',
-                },
-            },
-            'bold, fontSize, weightedFontFamily',
-        ]
         return [
-            {
-                'updateTextStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex': len(item['text']) + 1
-                    },
-                    'textStyle': formatting[0],
-                    'fields': formatting[1]
-                }
-            },
             {
                 'updateParagraphStyle': {
                     'range': {
                         'startIndex': 1,
-                        'endIndex':  10
+                        'endIndex':  len(item['text']) + 1
                     },
                     'paragraphStyle': {
-                        'namedStyleType': 'HEADING_1',
-                        'spaceAbove': {
-                            'magnitude': 10.0,
-                            'unit': 'PT'
-                        },
-                        'spaceBelow': {
-                            'magnitude': 10.0,
-                            'unit': 'PT'
-                        }
+                        'namedStyleType': 'NORMAL_TEXT',
                     },
-                    'fields': 'namedStyleType,spaceAbove,spaceBelow'
+                    'fields': 'namedStyleType'
+                }
+            },
+            {
+                'insertText': {
+                    'location': {
+                        'index': 1,
+                    },
+                    'text': checkbox + ' ' + item['text'] + newline
+                }
+            }
+        ]
+    elif item['type'] == 'h1' or item['type'] == 'h2':
+        namedStyleType = 'HEADING_1' if item['type'] == 'h1' else 'HEADING_2'
+        return [
+            {
+                'updateParagraphStyle': {
+                    'range': {
+                        'startIndex': 1,
+                        'endIndex':  len(item['text']) + 1
+                    },
+                    'paragraphStyle': {
+                        'namedStyleType': namedStyleType,
+                    },
+                    'fields': 'namedStyleType'
                 }
             },
             {
@@ -107,7 +91,7 @@ def translate_to_doc(item):
                     'location': {
                         'index': 1,
                     },
-                    'text': item['text'] + newline
+                    'text': item['text'] + newline + newline
                 }
             }
         ]
@@ -138,6 +122,57 @@ def translate_to_doc(item):
                 }
             },
             {
+                'updateParagraphStyle': {
+                    'range': {
+                        'startIndex': 1,
+                        'endIndex':  len(text) + 1
+                    },
+                    'paragraphStyle': {
+                        'namedStyleType': 'NORMAL_TEXT',
+                    },
+                    'fields': 'namedStyleType'
+                }
+            },
+            {
+                'insertText': {
+                    'location': {
+                        'index': 1,
+                    },
+                    'text': text + newline
+                }
+            }
+        ]
+    elif item['type'] == 'emoji':
+        text = item['text']
+        for name in item['data']:
+            text += name + ', '
+        formatting = [
+            {
+                'bold': False,
+                'fontSize': {
+                    'magnitude': 12,
+                    'unit': 'PT',
+                },
+                'weightedFontFamily': {
+                    'fontFamily': 'Roboto',
+                }
+            },
+            'bold, fontSize, weightedFontFamily',
+        ]
+        return [
+            {
+                'updateParagraphStyle': {
+                    'range': {
+                        'startIndex': 1,
+                        'endIndex':  len(text) + 1
+                    },
+                    'paragraphStyle': {
+                        'namedStyleType': 'NORMAL_TEXT',
+                    },
+                    'fields': 'namedStyleType'
+                }
+            },
+            {
                 'insertText': {
                     'location': {
                         'index': 1,
@@ -162,13 +197,15 @@ def translate_to_doc(item):
         ]
         return [
             {
-                'updateTextStyle': {
+                'updateParagraphStyle': {
                     'range': {
                         'startIndex': 1,
-                        'endIndex': len(item['text']) + 1
+                        'endIndex':  len(item['text']) + 1
                     },
-                    'textStyle': formatting[0],
-                    'fields': formatting[1]
+                    'paragraphStyle': {
+                        'namedStyleType': 'NORMAL_TEXT',
+                    },
+                    'fields': 'namedStyleType'
                 }
             },
             {
@@ -261,7 +298,7 @@ def main():
         {
             'text': "👍",
             'type': 'emoji',
-            'data': 0,
+            'data': ['Mayank Jain', 'Yee Chen', 'Mike Jiao'],
         },
         {
             'text': "Core Growth",
@@ -274,7 +311,7 @@ def main():
         {
             'text': "👍",
             'type': 'emoji',
-            'data': 0,
+            'data': [],
         },
         {
             'text': "International",
@@ -287,7 +324,7 @@ def main():
         {
             'text': "👍",
             'type': 'emoji',
-            'data': 0,
+            'data': [],
         },
         {
             'text': "SEO",
@@ -300,7 +337,7 @@ def main():
         {
             'text': "👍",
             'type': 'emoji',
-            'data': 0,
+            'data': [],
         },
         {
             'text': "Key Discussion",
