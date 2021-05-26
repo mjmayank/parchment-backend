@@ -13,6 +13,7 @@ def home_view():
         return "<h1>Welcome to Parchment</h1>"
 
 @app.route("/send/review", methods=["GET"])
+@cross_origin()
 def send_review_request():
   message = Mail(
       from_email='mjmayank@gmail.com',
@@ -29,6 +30,7 @@ def send_review_request():
   return "<div>Done!</div>"
 
 @app.route("/send/reminder", methods=["GET"])
+@cross_origin()
 def send_reminder_request():
   message = Mail(
       from_email='mjmayank@gmail.com',
@@ -45,6 +47,7 @@ def send_reminder_request():
   return "<div>Done!</div>"
 
 @app.route("/send/premeeting", methods=["GET"])
+@cross_origin()
 def send_reminder_request():
   message = Mail(
       from_email='mjmayank@gmail.com',
@@ -61,6 +64,7 @@ def send_reminder_request():
   return "<div>Done!</div>"
 
 @app.route("/send/postmeeting", methods=["GET"])
+@cross_origin()
 def send_reminder_request():
   message = Mail(
       from_email='mjmayank@gmail.com',
