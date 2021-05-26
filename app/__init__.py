@@ -44,7 +44,7 @@ def send_reminder_request():
   return "<div>Done!</div>"
 
 @app.route("/send/premeeting", methods=["GET"])
-def send_reminder_request():
+def send_premeeting():
   message = Mail(
       from_email='mjmayank@gmail.com',
       to_emails='mjmayank@gmail.com')
@@ -60,7 +60,7 @@ def send_reminder_request():
   return "<div>Done!</div>"
 
 @app.route("/send/postmeeting", methods=["GET"])
-def send_reminder_request():
+def send_postmeeting():
   message = Mail(
       from_email='mjmayank@gmail.com',
       to_emails='mjmayank@gmail.com')
