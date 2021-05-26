@@ -381,43 +381,6 @@ def main():
 
     print(requests[::-1])
 
-    # requests = [
-    #     {
-    #         'insertText': {
-    #             'location': {
-    #                 'index': 1,
-    #             },
-    #             'text': title
-    #         }
-    #     },
-    #     {
-    #         'insertText': {
-    #             'location': {
-    #                 'index': 6,
-    #             },
-    #             'text': '\n'
-    #         }
-    #     },
-    #     {
-    #         'insertText': {
-    #             'location': {
-    #                 'index': 7,
-    #             },
-    #             'text': checkbox
-    #         }
-    #     },
-    #     {
-    #         'updateTextStyle': {
-    #             'range': {
-    #                 'startIndex': 1,
-    #                 'endIndex': 6
-    #             },
-    #             'textStyle': headline[0],
-    #             'fields': headline[1]
-    #         }
-    #     },
-    # ]
-
     result = service.documents().batchUpdate(
         documentId=DOCUMENT_ID, body={'requests': requests[::-1]}).execute()
 
