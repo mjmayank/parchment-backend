@@ -12,8 +12,8 @@ def home_view():
 @app.route("/send", methods=["GET"])
 def send_email():
   message = Mail(
-      from_email='from_email@example.com',
-      to_emails='to@example.com',
+      from_email='mjmayank@gmail.com',
+      to_emails='mjmayank@gmail.com',
       subject='Sending with Twilio SendGrid is Fun',
       html_content='<strong>and easy to do anywhere, even with Python</strong>')
   try:
