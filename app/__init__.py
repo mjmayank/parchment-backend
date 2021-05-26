@@ -30,9 +30,10 @@ def send_review_request():
 
 @app.route("/send/reminder", methods=["GET"])
 def send_reminder_request():
+  email = request.args.get('email')
   message = Mail(
       from_email='mjmayank@gmail.com',
-      to_emails='mjmayank@gmail.com')
+      to_emails=email)
   message.template_id = 'd-b0830da153e44dfc804cd1b33622dd59'
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
@@ -46,9 +47,10 @@ def send_reminder_request():
 
 @app.route("/send/premeeting", methods=["GET"])
 def send_premeeting():
+  email = request.args.get('email')
   message = Mail(
       from_email='mjmayank@gmail.com',
-      to_emails='mjmayank@gmail.com')
+      to_emails=email)
   message.template_id = 'd-1ed6ddbaacb54c0fa15841f52b02b890'
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
@@ -62,9 +64,10 @@ def send_premeeting():
 
 @app.route("/send/postmeeting", methods=["GET"])
 def send_postmeeting():
+  email = request.args.get('email')
   message = Mail(
       from_email='mjmayank@gmail.com',
-      to_emails='mjmayank@gmail.com')
+      to_emails=email)
   message.template_id = 'd-75860aa6fd8b4535b88d4aa5146bf7fe'
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
