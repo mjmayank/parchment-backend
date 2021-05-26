@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 import os
 from sendgrid import SendGridAPIClient
@@ -13,9 +13,10 @@ def home_view():
 
 @app.route("/send/review", methods=["GET"])
 def send_review_request():
+  email = request.args.get('email')
   message = Mail(
       from_email='mjmayank@gmail.com',
-      to_emails='mjmayank@gmail.com')
+      to_emails=email)
   message.template_id = 'd-fe954c63b4b6489dab6074dde908b216'
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
