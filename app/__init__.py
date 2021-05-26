@@ -9,7 +9,7 @@ app = Flask(__name__)
 def home_view():
         return "<h1>Welcome to Geeks for Geeks</h1>"
 
-@app.route("/send")
+@app.route("/send", methods=["GET"])
 def send_email():
   message = Mail(
       from_email='from_email@example.com',
