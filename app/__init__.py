@@ -14,8 +14,7 @@ def send_email():
   message = Mail(
       from_email='mjmayank@gmail.com',
       to_emails='mjmayank@gmail.com',
-      subject='Sending with Twilio SendGrid is Fun',
-      html_content='<strong>and easy to do anywhere, even with Python</strong>')
+      template_id='d-fe954c63b4b6489dab6074dde908b216')
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
       response = sg.send(message)
@@ -24,3 +23,4 @@ def send_email():
       print(response.headers)
   except Exception as e:
       print(e.message)
+  return "<div>Done!</div>"
