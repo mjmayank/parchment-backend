@@ -1,10 +1,9 @@
+from __future__ import print_function
 from flask import Flask, request
 from flask_cors import CORS
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-
-from __future__ import print_function
 import os.path
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
