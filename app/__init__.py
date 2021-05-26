@@ -1,9 +1,12 @@
 from flask import Flask
+from flask_cors import CORS, cross_origin
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
   
 app = Flask(__name__)
+cors = CORS(app)
+app.config['CORS_HEADERS'] = 'Content-Type'
   
 @app.route("/")
 def home_view():
