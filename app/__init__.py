@@ -1,18 +1,57 @@
 from __future__ import print_function
-from flask import Flask, request
+from flask import Flask, request, redirect, url_for, session, jsonify
 from flask_cors import CORS
 import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import os.path
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google.oauth2 import id_token
+import sys
+from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
+app.secret_key = 'the random string'
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get('DATABASE_URL')
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 cors = CORS(app)
-  
+db = SQLAlchemy(app)
+
+SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email']
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String, unique=True, nullable=False)
+    token = db.Column(db.String, unique=False, nullable=True)
+    refresh_token = db.Column(db.String, unique=False, nullable=True)
+    expiry = db.Column(db.String, unique=False, nullable=True)
+    access_token = db.Column(db.String, unique=False, nullable=True)
+    
+
+# db.create_all()
+
+def get_user_info(creds):
+  """Send a request to the UserInfo API to retrieve the user's information.
+
+  Args:
+    credentials: oauth2client.client.OAuth2Credentials instance to authorize the
+                 request.
+  Returns:
+    User information as a dict.
+  """
+  user_info_service = build('oauth2', 'v2', credentials=creds)
+  user_info = None
+  try:
+    user_info = user_info_service.userinfo().get().execute()
+  except ValueError as e:
+    app.logger.error('An error occurred: %s', e)
+  if user_info and user_info.get('id'):
+    app.logger.info(user_info)
+    return user_info.get('email')
+
 @app.route("/")
 def home_view():
         return "<h1>Welcome to Parchment</h1>"
@@ -87,15 +126,25 @@ def send_postmeeting():
 
 @app.route("/document", methods=["GET"])
 def sync_document():
-  print(request.args.get('idToken'))
+  token = request.args.get('idToken')
+  try:
+    CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
+    DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
+    # Specify the CLIENT_ID of the app that accesses the backend:
+    idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
+    email = idinfo['email']
+    user = User.query.filter_by(email=email).first()
+    user.access_token = token
+    db.session.commit()
+    return jsonify(user)
+  except ValueError as err:
+    # Invalid token
+    app.logger.info(err)
+    pass
+  return idinfo
 
-def create_doc():
-  # If modifying these scopes, delete the file token.json.
-  SCOPES = ['https://www.googleapis.com/auth/documents']
-
-  # The ID of a sample document.
-  DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
-
+@app.route("/document2", methods=["GET"])
+def sign_in():
   """Shows basic usage of the Docs API.
   Prints the title of a sample document.
   """
@@ -110,144 +159,85 @@ def create_doc():
       if creds and creds.expired and creds.refresh_token:
           creds.refresh(Request())
       else:
-          flow = InstalledAppFlow.from_client_secrets_file(
+          flow = Flow.from_client_secrets_file(
               'credentials.json', SCOPES)
-          creds = flow.run_local_server(port=8000)
-      # Save the credentials for the next run
-      with open('token.json', 'w') as token:
-          token.write(creds.to_json())
+          flow.redirect_uri = 'http://localhost:5000/document3'
+          # Generate URL for request to Google's OAuth 2.0 server.
+          # Use kwargs to set optional request parameters.
+          authorization_url, _ = flow.authorization_url(
+              # Enable offline access so that you can refresh an access token without
+              # re-prompting the user for permission. Recommended for web server apps.
+              access_type='offline',
+              # Enable incremental authorization. Recommended as a best practice.
+              include_granted_scopes='true')
+          return redirect(authorization_url)
+          # creds = flow.run_local_server(port=8000)
 
+@app.route("/document3", methods=["GET"])
+def create_doc():
+  # The ID of a sample document.
+  DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
+
+  flow = Flow.from_client_secrets_file(
+      'credentials.json',
+      scopes=SCOPES)
+  flow.redirect_uri = url_for('create_doc', _external=True)
+  app.logger.info('redirecturi', flow.redirect_uri)
+
+  authorization_response = request.url
+  flow.fetch_token(authorization_response=authorization_response)
+
+  # Store the credentials in the session.
+  # ACTION ITEM for developers:
+  #     Store user's access and refresh tokens in your data store if
+  #     incorporating this code into your real app.
+  creds = flow.credentials
+  # Save the credentials for the next run
+  with open('token.json', 'w') as token:
+      token.write(creds.to_json())
+  session['credentials'] = {
+      'token': creds.token,
+      'refresh_token': creds.refresh_token,
+      'token_uri': creds.token_uri,
+      'client_id': creds.client_id,
+      'client_secret': creds.client_secret,
+      'scopes': creds.scopes}
+  email = get_user_info(creds)
+  new_user = User(
+    email=email,
+    token=creds.token,
+    refresh_token=creds.refresh_token,
+    expiry=creds.expiry,
+  )
+  db.session.add(new_user)
+  db.session.commit()
+
+@app.route("/document/create", methods=["POST"])
+def generate_doc():
+  print(request.json)
+  token = request.json['idToken']
+  document_data = request.json['documentData']
+  CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
+  DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
+  # Specify the CLIENT_ID of the app that accesses the backend:
+  idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
+  email = idinfo['email']
+  user = User.query.filter_by(email=email).first()
+  creds_info = {
+    'refresh_token': user.refresh_token,
+    'token': user.access_token,
+    'expiry': user.expiry.replace(' ', 'T'),
+    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_id': CLIENT_ID,
+    'token_uri': 'https://oauth2.googleapis.com/token',
+  }
+  print(creds_info)
+  creds = None
+  creds = Credentials.from_authorized_user_info(creds_info)
   service = build('docs', 'v1', credentials=creds)
 
   # Retrieve the documents contents from the Docs service.
   document = service.documents().get(documentId=DOCUMENT_ID).execute()
-
-  document_data = [
-      {
-          'text': "Document created by MayankDoc",
-          'type': "watermark",
-      },
-      {
-          'text': "Growth Roadmap Review: 10:30am-11:30am",
-          'type': "event",
-      },
-      { 
-          'text': "Growth Roadmap Review",
-          'type': "h1",
-      },
-      {
-          'text': "Agenda",
-          'type': "h2",
-      },
-      {
-          'text': "Roadmap Study Hall - 15 minutes",
-          'type': "p",
-      },
-      {
-          'text': "Roadmap Discussion - 20 minutes",
-          'type': "p",
-      },
-      {
-          'text': "Backlog Review - 20 minutes",
-          'type': "p",
-      },
-      {
-          'text': "Follow Ups",
-          'type': "h2",
-      },
-      {
-          'text': "",
-          'type': "check",
-      },
-      {
-          'text': "Roadmap",
-          'type': "h2",
-      },
-      {
-          'text': "Channels",
-          'type': "p",
-      },
-      {
-          'text': "Rose Liu",
-          'type': "request",
-      },
-      {
-          'text': "👍",
-          'type': 'emoji',
-          'data': ['Mayank Jain', 'Yee Chen', 'Mike Jiao'],
-      },
-      {
-          'text': "Core Growth",
-          'type': "p",
-      },
-      {
-          'text': "Mike Jiao",
-          'type': "request",
-      },
-      {
-          'text': "👍",
-          'type': 'emoji',
-          'data': [],
-      },
-      {
-          'text': "International",
-          'type': "p",
-      },
-      {
-          'text': "Jason Lee",
-          'type': "request",
-      },
-      {
-          'text': "👍",
-          'type': 'emoji',
-          'data': [],
-      },
-      {
-          'text': "SEO",
-          'type': "p",
-      },
-      {
-          'text': "Chuck Kao",
-          'type': "request",
-      },
-      {
-          'text': "👍",
-          'type': 'emoji',
-          'data': [],
-      },
-      {
-          'text': "Key Discussion",
-          'type': "h2",
-      },
-      {
-          'text': "Can we do anything to accelerate subreddit notifications?",
-          'type': "discussion",
-      },
-      {
-          'text': "Action Items",
-          'type': "h2",
-      },
-      {
-          'text': "",
-          'type': "check",
-      },
-      {
-          'text': "Signoff",
-          'type': "h2",
-      },
-      {
-          'text': "KD Bhulani",
-          'type': "signoff",
-      },
-      {
-          'text': "Vee Sahgal",
-          'type': "signoff",
-      },
-      {
-          'text': "Yee Chen",
-          'type': "signoff",
-      }
-  ]
 
   requests = []
 
@@ -261,6 +251,7 @@ def create_doc():
       documentId=DOCUMENT_ID, body={'requests': requests[::-1]}).execute()
 
   print('The title of the document is: {}'.format(document.get('title')))
+  return creds.to_json()
 
 def translate_to_doc(item):
     newline = '\n'
