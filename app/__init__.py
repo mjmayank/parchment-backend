@@ -15,7 +15,8 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL').replace("://", "ql://", 1)
+# SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL').replace("://", "ql://", 1)
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 cors = CORS(app)
@@ -162,7 +163,8 @@ def sign_in():
       else:
           flow = Flow.from_client_secrets_file(
               'credentials.json', SCOPES)
-          flow.redirect_uri = 'https://limitless-sierra-24357.herokuapp.com/document3'
+          # flow.redirect_uri = 'https://limitless-sierra-24357.herokuapp.com/document3'
+          flow.redirect_uri = 'http://localhost:5000/document3'
           # Generate URL for request to Google's OAuth 2.0 server.
           # Use kwargs to set optional request parameters.
           authorization_url, _ = flow.authorization_url(
@@ -193,9 +195,6 @@ def create_doc():
   #     Store user's access and refresh tokens in your data store if
   #     incorporating this code into your real app.
   creds = flow.credentials
-  # Save the credentials for the next run
-  with open('token.json', 'w') as token:
-      token.write(creds.to_json())
   session['credentials'] = {
       'token': creds.token,
       'refresh_token': creds.refresh_token,
@@ -204,14 +203,19 @@ def create_doc():
       'client_secret': creds.client_secret,
       'scopes': creds.scopes}
   email = get_user_info(creds)
-  new_user = User(
-    email=email,
-    token=creds.token,
-    refresh_token=creds.refresh_token,
-    expiry=creds.expiry,
-  )
-  db.session.add(new_user)
-  db.session.commit()
+  user = User.query.filter_by(email=email).first()
+  if user:
+    new_user = user
+  else:
+    new_user = User(
+      email=email,
+      token=creds.token,
+      refresh_token=creds.refresh_token,
+      expiry=creds.expiry,
+    )
+    db.session.add(new_user)
+    db.session.commit()
+  return jsonify({ 'email': new_user.email })
 
 @app.route("/document/create", methods=["POST"])
 def generate_doc():
