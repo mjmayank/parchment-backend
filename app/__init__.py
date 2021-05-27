@@ -33,8 +33,6 @@ class User(db.Model):
     access_token = db.Column(db.String, unique=False, nullable=True)
     
 
-# db.create_all()
-
 def get_user_info(creds):
   """Send a request to the UserInfo API to retrieve the user's information.
 
@@ -56,7 +54,8 @@ def get_user_info(creds):
 
 @app.route("/")
 def home_view():
-        return "<h1>Welcome to Parchment</h1>"
+  db.create_all()
+  return "<h1>Welcome to Parchment</h1>"
 
 @app.route("/send/review", methods=["GET"])
 def send_review_request():
