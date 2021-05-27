@@ -15,8 +15,8 @@ from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
-# SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL').replace("://", "ql://", 1)
-SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL').replace("://", "ql://", 1)
+# SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 cors = CORS(app)
@@ -163,8 +163,8 @@ def sign_in():
       else:
           flow = Flow.from_client_secrets_file(
               'credentials.json', SCOPES)
-          # flow.redirect_uri = 'https://limitless-sierra-24357.herokuapp.com/document3'
-          flow.redirect_uri = 'http://localhost:5000/document3'
+          flow.redirect_uri = 'https://limitless-sierra-24357.herokuapp.com/document3'
+          # flow.redirect_uri = 'http://localhost:5000/document3'
           # Generate URL for request to Google's OAuth 2.0 server.
           # Use kwargs to set optional request parameters.
           authorization_url, _ = flow.authorization_url(
