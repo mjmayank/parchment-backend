@@ -57,6 +57,14 @@ def home_view():
   db.create_all()
   return "<h1>Welcome to Parchment</h1>"
 
+@app.route("/")
+def test_view():
+  user = User.query.filter_by(email='arjunb023@gmail.com').first()
+  if user:
+    return { 'email': user.email }
+  else:
+    return { 'email': 'notfound' }
+
 @app.route("/send/review", methods=["GET"])
 def send_review_request():
   email = request.args.get('email')
@@ -195,16 +203,22 @@ def create_doc():
   #     incorporating this code into your real app.
   creds = flow.credentials
   session['credentials'] = {
-      'token': creds.token,
-      'refresh_token': creds.refresh_token,
-      'token_uri': creds.token_uri,
-      'client_id': creds.client_id,
-      'client_secret': creds.client_secret,
-      'scopes': creds.scopes}
+    'token': creds.token,
+    'refresh_token': creds.refresh_token,
+    'token_uri': creds.token_uri,
+    'client_id': creds.client_id,
+    'client_secret': creds.client_secret,
+    'scopes': creds.scopes
+  }
   email = get_user_info(creds)
   user = User.query.filter_by(email=email).first()
   if user:
     new_user = user
+    if not user.refresh_token:
+      user.token=creds.token
+      user.refresh_token=creds.token
+      user.expiry=credits.expiry
+      db.session.commmit()
   else:
     new_user = User(
       email=email,
@@ -227,6 +241,7 @@ def generate_doc():
   idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
+  print(user.email)
   creds_info = {
     'refresh_token': user.refresh_token,
     'token': user.access_token,
@@ -235,7 +250,6 @@ def generate_doc():
     'client_id': CLIENT_ID,
     'token_uri': 'https://oauth2.googleapis.com/token',
   }
-  print(creds_info)
   creds = None
   creds = Credentials.from_authorized_user_info(creds_info)
   service = build('docs', 'v1', credentials=creds)
