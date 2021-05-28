@@ -57,7 +57,7 @@ def home_view():
   db.create_all()
   return "<h1>Welcome to Parchment</h1>"
 
-@app.route("/")
+@app.route("/test")
 def test_view():
   user = User.query.filter_by(email='arjunb023@gmail.com').first()
   if user:
