@@ -225,7 +225,6 @@ def create_doc():
   email = get_user_info(creds)
   user = User.query.filter_by(email=email).first()
   if user:
-    new_user = user
     if not user.refresh_token:
       user.token=creds.token
       user.refresh_token=creds.refresh_token
@@ -233,16 +232,16 @@ def create_doc():
       db.session.add(user)
       db.session.commmit()
   else:
-    new_user = User(
+    user = User(
       email=email,
       token=creds.token,
       refresh_token=creds.refresh_token,
       expiry=creds.expiry,
     )
-    db.session.add(new_user)
+    db.session.add(user)
     db.session.commit()
   return jsonify({
-    'email': new_user.email,
+    'email': user.email,
     'refresh_token': user.refresh_token
   })
 
