@@ -59,7 +59,8 @@ def home_view():
 
 @app.route("/test")
 def test_view():
-  user = User.query.filter_by(email='arjunb023@gmail.com').first()
+  email = request.args.get('email')
+  user = User.query.filter_by(email=email).first()
   if user:
     return { 'email': user.email }
   else:
