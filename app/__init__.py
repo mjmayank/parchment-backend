@@ -62,6 +62,12 @@ def test_view():
   email = request.args.get('email')
   user = User.query.filter_by(email=email).first()
   if user:
+    if not user.refresh_token:
+      return {
+      'email': user.email,
+      'token': user.token,
+      'access_token': user.access_token
+    }
     return {
       'email': user.email,
       'token': user.token,
