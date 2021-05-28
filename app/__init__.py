@@ -222,7 +222,7 @@ def create_doc():
     new_user = user
     if not user.refresh_token:
       user.token=creds.token
-      user.refresh_token=creds.token
+      user.refresh_token=creds.refresh_token
       user.expiry=credits.expiry
       db.session.commmit()
   else:
