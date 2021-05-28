@@ -66,6 +66,7 @@ def test_view():
       'email': user.email,
       'token': user.token,
       'access_token': user.access_token,
+      'refresh_token': user.refresh_token,
     }
   else:
     return { 'email': 'notfound' }
