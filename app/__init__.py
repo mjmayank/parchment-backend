@@ -230,6 +230,7 @@ def create_doc():
       user.token=creds.token
       user.refresh_token=creds.refresh_token
       user.expiry=credits.expiry
+      db.session.add(user)
       db.session.commmit()
   else:
     new_user = User(
@@ -240,7 +241,10 @@ def create_doc():
     )
     db.session.add(new_user)
     db.session.commit()
-  return jsonify({ 'email': new_user.email })
+  return jsonify({
+    'email': new_user.email,
+    'refresh_token': user.refresh_token
+  })
 
 @app.route("/document/create", methods=["POST"])
 def generate_doc():
