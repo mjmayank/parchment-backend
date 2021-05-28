@@ -230,7 +230,7 @@ def create_doc():
       user.refresh_token=creds.refresh_token
       user.expiry=creds.expiry
       db.session.add(user)
-      db.session.commmit()
+      db.session.commit()
   else:
     user = User(
       email=email,
