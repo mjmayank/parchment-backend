@@ -23,6 +23,7 @@ cors = CORS(app)
 db = SQLAlchemy(app)
 
 SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email']
+CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -145,13 +146,26 @@ def send_postmeeting():
       print(e.message)
   return "<div>Done!</div>"
 
+@app.route("/checkRegistration", methods=["POST"])
+def check_registration():
+  token = request.json.get('idToken')
+  app.logger.info(token)
+  try:
+    # Specify the CLIENT_ID of the app that accesses the backend:
+    idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
+    email = idinfo['email']
+    user = User.query.filter_by(email=email).first()
+    if user:
+      return 'User registered', 200
+    else:
+      return 'User not registered', 404
+  except ValueError as err:
+    return str(err), 500
+
 @app.route("/document", methods=["GET"])
 def sync_document():
   token = request.args.get('idToken')
   try:
-    CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
-    DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
-    # Specify the CLIENT_ID of the app that accesses the backend:
     idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
     email = idinfo['email']
     user = User.query.filter_by(email=email).first()
@@ -164,7 +178,7 @@ def sync_document():
     pass
   return idinfo
 
-@app.route("/document2", methods=["GET"])
+@app.route("/signin", methods=["GET"])
 def sign_in():
   """Shows basic usage of the Docs API.
   Prints the title of a sample document.
@@ -248,11 +262,11 @@ def create_doc():
 @app.route("/document/create", methods=["POST"])
 def generate_doc():
   print(request.json)
-  token = request.json['idToken']
+  token = request.json.get('idToken')
+  if not token:
+    return 'No token sent', 500
   document_data = request.json['documentData']
-  CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
   DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
-  # Specify the CLIENT_ID of the app that accesses the backend:
   idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
@@ -288,8 +302,8 @@ def generate_doc():
 
 def translate_to_doc(item):
     newline = '\n'
-    checkbox = '[ ]'
     if item['type'] == 'check':
+        checkbox = '[ ]' if item['data'] else '[X]'
         return [
             {
                 'updateParagraphStyle': {
@@ -492,3 +506,4 @@ def translate_to_doc(item):
                 }
             }
         ]
+
