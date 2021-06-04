@@ -30,6 +30,7 @@ db = SQLAlchemy(app)
 
 SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email']
 CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
+DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -184,6 +185,29 @@ def sync_document():
     pass
   return idinfo
 
+@app.route("/createNew", methods=["POST"])
+def create_new_document():
+  token = request.json.get('idToken')
+  if not token:
+    return 'No token sent', 500
+  idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
+  email = idinfo['email']
+  user = User.query.filter_by(email=email).first()
+  creds_info = {
+    'refresh_token': user.refresh_token,
+    'token': user.access_token,
+    'expiry': user.expiry.replace(' ', 'T'),
+    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_id': CLIENT_ID,
+    'token_uri': 'https://oauth2.googleapis.com/token',
+  }
+  creds = None
+  creds = Credentials.from_authorized_user_info(creds_info)
+  service = build('docs', 'v1', credentials=creds)
+  doc = service.documents().create().execute()
+  app.logger.info(doc)
+  return { 'documentId': doc.get('documentId') }
+
 @app.route("/signin", methods=["GET"])
 def sign_in():
   """Shows basic usage of the Docs API.
@@ -212,15 +236,14 @@ def sign_in():
               # re-prompting the user for permission. Recommended for web server apps.
               access_type='offline',
               # Enable incremental authorization. Recommended as a best practice.
-              include_granted_scopes='true')
+              include_granted_scopes='true',
+              # force approval prompt to get access token
+              approval_prompt='force')
           return redirect(authorization_url)
           # creds = flow.run_local_server(port=8000)
 
 @app.route("/document3", methods=["GET"])
 def create_doc():
-  # The ID of a sample document.
-  DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
-
   flow = Flow.from_client_secrets_file(
       'credentials.json',
       scopes=SCOPES)
@@ -261,6 +284,8 @@ def create_doc():
     )
     db.session.add(user)
     db.session.commit()
+  if (user.refresh_token):
+    return 'You can close this tab'
   return jsonify({
     'email': user.email,
     'refresh_token': user.refresh_token
@@ -273,7 +298,10 @@ def generate_doc():
   if not token:
     return 'No token sent', 500
   document_data = request.json['documentData']
-  DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
+  document_id = request.json.get('documentId')
+  if not document_id:
+    document_id = DOCUMENT_ID
+    app.logger.warn('No document ID provided. Using default document.')
   idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
@@ -291,7 +319,7 @@ def generate_doc():
   service = build('docs', 'v1', credentials=creds)
 
   # Retrieve the documents contents from the Docs service.
-  document = service.documents().get(documentId=DOCUMENT_ID).execute()
+  document = service.documents().get(documentId=document_id).execute()
 
   requests = []
 
@@ -302,7 +330,7 @@ def generate_doc():
   print(requests[::-1])
 
   result = service.documents().batchUpdate(
-      documentId=DOCUMENT_ID, body={'requests': requests[::-1]}).execute()
+      documentId=document_id, body={'requests': requests[::-1]}).execute()
 
   print('The title of the document is: {}'.format(document.get('title')))
   return creds.to_json()
