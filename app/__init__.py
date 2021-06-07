@@ -12,6 +12,8 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
 import sys
 from flask_sqlalchemy import SQLAlchemy
+from emoji import UNICODE_EMOJI
+import json
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
@@ -30,7 +32,7 @@ db = SQLAlchemy(app)
 
 SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email']
 CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
-DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo'
+DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo' if not os.environ.get('DOCUMENT_ID') else os.environ.get('DOCUMENT_ID')
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -335,10 +337,49 @@ def generate_doc():
   print('The title of the document is: {}'.format(document.get('title')))
   return creds.to_json()
 
+@app.route("/document/sync", methods=["POST"])
+def sync_from_doc():
+  print(request.json)
+  token = request.json.get('idToken')
+  if not token:
+    return 'No token sent', 500
+  # document_data = request.json['documentData']
+  document_id = request.json.get('documentId')
+  if not document_id:
+    document_id = DOCUMENT_ID
+    app.logger.warn('No document ID provided. Using default document.')
+  idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
+  email = idinfo['email']
+  user = User.query.filter_by(email=email).first()
+  print(user.email)
+  creds_info = {
+    'refresh_token': user.refresh_token,
+    'token': user.access_token,
+    'expiry': user.expiry.replace(' ', 'T'),
+    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_id': CLIENT_ID,
+    'token_uri': 'https://oauth2.googleapis.com/token',
+  }
+  creds = None
+  creds = Credentials.from_authorized_user_info(creds_info)
+  service = build('docs', 'v1', credentials=creds)
+
+  # Retrieve the documents contents from the Docs service.
+  document = service.documents().get(documentId=document_id).execute()
+  doc_content = document.get('body').get('content')
+  document_data = []
+  for value in doc_content:
+    if 'paragraph' in value:
+      elements = value.get('paragraph').get('elements')
+      for elem in elements:
+        document_data.append(translate_from_doc(elem, value.get('paragraph')))
+  return json.dumps(document_data)
+
+
 def translate_to_doc(item):
     newline = '\n'
     if item['type'] == 'check':
-        checkbox = '[ ]' if item['data'] else '[X]'
+        checkbox = '[ ]' if 'data' in item else '[X]'
         return [
             {
                 'updateParagraphStyle': {
@@ -542,3 +583,28 @@ def translate_to_doc(item):
             }
         ]
 
+
+def translate_from_doc(item, paragraph):
+    text_run = item.get('textRun')
+    text = text_run.get('content') if text_run else ''
+
+    text_type = ''
+    data = []
+
+    if text.startswith(("[ ]", "[X]")):
+      text_type = 'check'
+      text = text[:3]
+    elif paragraph.get('paragraphStyle').get('namedStyleType') == 'HEADING_1':
+      text_type = 'h1'
+    elif paragraph.get('paragraphStyle').get('namedStyleType') == 'HEADING_2':
+      text_type = 'h2'
+    elif text.startswith("Input requested from "):
+      text_type = 'request'
+    elif text.startswith(tuple(UNICODE_EMOJI['en'].keys())):
+      text_type = 'emoji'
+      data = text[1:]
+      text = text[:1]
+    else:
+      text_type = 'text'
+
+    return {'text': text, 'type': text_type, 'data': data}
