@@ -368,13 +368,18 @@ def sync_from_doc():
   # Retrieve the documents contents from the Docs service.
   document = service.documents().get(documentId=document_id).execute()
   doc_content = document.get('body').get('content')
+  doc_title = document.get('title')
+  app.logger.info(doc_title)
   document_data = []
   for value in doc_content:
     if 'paragraph' in value:
       elements = value.get('paragraph').get('elements')
       for elem in elements:
         document_data.append(translate_from_doc(elem, value.get('paragraph')))
-  return json.dumps(document_data)
+  return { 
+    'title': doc_title,
+    'body': document_data,
+  }
 
 
 def translate_to_doc(item):
