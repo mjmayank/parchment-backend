@@ -10,10 +10,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
-import sys
 from flask_sqlalchemy import SQLAlchemy
 from emoji import UNICODE_EMOJI
 import json
+import requests
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
@@ -41,6 +41,7 @@ class User(db.Model):
     refresh_token = db.Column(db.String, unique=False, nullable=True)
     expiry = db.Column(db.String, unique=False, nullable=True)
     access_token = db.Column(db.String, unique=False, nullable=True)
+    github_oauth_token = db.Column(db.String, unique=False, nullable=True)
     
 
 def get_user_info(creds):
@@ -339,7 +340,7 @@ def generate_doc():
 
 @app.route("/document/sync", methods=["POST"])
 def sync_from_doc():
-  print(request.json)
+  app.logger.info(request.json)
   token = request.json.get('idToken')
   if not token:
     return 'No token sent', 500
@@ -608,3 +609,65 @@ def translate_from_doc(item, paragraph):
       text_type = 'text'
 
     return {'text': text, 'type': text_type, 'data': data}
+
+@app.route("/github/read", methods=["POST"])
+def read_from_github():
+  repo = request.args.get('repo')
+  google_token = None
+  document_id = None
+  if request.json:
+    google_token = request.json.get('idToken')
+    document_id = request.json.get('documentId')
+  github_token = None
+  if os.environ.get('FLASK_ENV') == 'development':
+    github_token = os.environ.get('GITHUB_OAUTH')
+  else:
+    if not google_token:
+      return 'No Google token sent', 500
+    idinfo = id_token.verify_oauth2_token(google_token, Request(), CLIENT_ID)
+    email = idinfo['email']
+    user = User.query.filter_by(email=email).first()
+    github_token = user.github_token or os.environ.get('GITHUB_OAUTH')
+  if not github_token:
+    return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 500
+  GITHUB_URL = 'https://api.github.com'
+  users = []
+  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner='mjmayank1', repo=repo, pull_number=1)
+  r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
+  app.logger.info(url)
+  app.logger.info(r.json())
+  for reviewer in r.json():
+    if reviewer:
+      app.logger.info(reviewer)
+      users.append(reviewer.get('user').get('login'))
+  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner='mjmayank1', repo=repo, pull_number=1)
+  r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
+  for reviewer in r.json().get('users'):
+    if reviewer:
+      users.append(reviewer.get('login'))
+  document_data = []
+  for user in users:
+    document_data.append({
+      'type': 'p',
+      'text': user,
+    })
+  requests.post('http://localhost:5000/document/create', json={
+    'idToken': google_token,
+    'documentId': document_id,
+    'documentData': document_data,
+  })
+  return { 'data': users }
+
+@app.route("/github/sync", methods=["POST"])
+def sync_github():
+  github_token = request.json.get('token')
+  google_token = request.json.get('idToken')
+  if not google_token:
+    return 'No Google token sent', 500
+  idinfo = id_token.verify_oauth2_token(google_token, Request(), CLIENT_ID)
+  email = idinfo['email']
+  user = User.query.filter_by(email=email).first()
+  user.github_token = github_token
+  db.session.add(user)
+  db.session.commit()
+  return "Github token saved successfully", 200
