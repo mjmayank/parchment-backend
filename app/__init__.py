@@ -14,6 +14,7 @@ from flask_sqlalchemy import SQLAlchemy
 from emoji import UNICODE_EMOJI
 import json
 import requests
+from app.doc_translator import translate_from_doc, translate_to_doc
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
@@ -30,7 +31,11 @@ ROOT_DOMAIN = ('https://limitless-sierra-24357.herokuapp.com'
 cors = CORS(app)
 db = SQLAlchemy(app)
 
-SCOPES = ['https://www.googleapis.com/auth/documents', 'https://www.googleapis.com/auth/userinfo.email']
+SCOPES = [
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/drive',
+]
 CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
 DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo' if not os.environ.get('DOCUMENT_ID') else os.environ.get('DOCUMENT_ID')
 
@@ -98,9 +103,6 @@ def send_review_request():
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
       response = sg.send(message)
-      print(response.status_code)
-      print(response.body)
-      print(response.headers)
   except Exception as e:
       print(e.message)
   return "<div>Done!</div>"
@@ -115,9 +117,6 @@ def send_reminder_request():
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
       response = sg.send(message)
-      print(response.status_code)
-      print(response.body)
-      print(response.headers)
   except Exception as e:
       print(e.message)
   return "<div>Done!</div>"
@@ -132,9 +131,6 @@ def send_premeeting():
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
       response = sg.send(message)
-      print(response.status_code)
-      print(response.body)
-      print(response.headers)
   except Exception as e:
       print(e.message)
   return "<div>Done!</div>"
@@ -149,9 +145,6 @@ def send_postmeeting():
   try:
       sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
       response = sg.send(message)
-      print(response.status_code)
-      print(response.body)
-      print(response.headers)
   except Exception as e:
       print(e.message)
   return "<div>Done!</div>"
@@ -296,7 +289,6 @@ def create_doc():
 
 @app.route("/document/create", methods=["POST"])
 def generate_doc():
-  print(request.json)
   token = request.json.get('idToken')
   if not token:
     return 'No token sent', 500
@@ -308,7 +300,6 @@ def generate_doc():
   idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
-  print(user.email)
   creds_info = {
     'refresh_token': user.refresh_token,
     'token': user.access_token,
@@ -330,12 +321,9 @@ def generate_doc():
       docs_item = translate_to_doc(item)
       requests += docs_item
 
-  print(requests[::-1])
-
   result = service.documents().batchUpdate(
       documentId=document_id, body={'requests': requests[::-1]}).execute()
 
-  print('The title of the document is: {}'.format(document.get('title')))
   return creds.to_json()
 
 @app.route("/document/sync", methods=["POST"])
@@ -352,7 +340,6 @@ def sync_from_doc():
   idinfo = id_token.verify_oauth2_token(token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
-  print(user.email)
   creds_info = {
     'refresh_token': user.refresh_token,
     'token': user.access_token,
@@ -380,240 +367,6 @@ def sync_from_doc():
     'title': doc_title,
     'body': document_data,
   }
-
-
-def translate_to_doc(item):
-    newline = '\n'
-    if item['type'] == 'check':
-        checkbox = '[ ]' if 'data' in item else '[X]'
-        return [
-            {
-                'updateParagraphStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex':  len(item['text']) + 1
-                    },
-                    'paragraphStyle': {
-                        'namedStyleType': 'NORMAL_TEXT',
-                    },
-                    'fields': 'namedStyleType'
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': checkbox + ' ' + item['text'] + newline
-                }
-            }
-        ]
-    elif item['type'] == 'h1' or item['type'] == 'h2':
-        namedStyleType = 'HEADING_1' if item['type'] == 'h1' else 'HEADING_2'
-        return [
-            {
-                'updateParagraphStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex':  len(item['text']) + 1
-                    },
-                    'paragraphStyle': {
-                        'namedStyleType': namedStyleType,
-                    },
-                    'fields': 'namedStyleType'
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': item['text'] + newline
-                }
-            },
-        ]
-    elif item['type'] == 'watermark':
-        formatting = [
-            {
-                'bold': False,
-                'fontSize': {
-                    'magnitude': 10,
-                    'unit': 'PT',
-                },
-                'weightedFontFamily': {
-                    'fontFamily': 'Roboto',
-                }
-            },
-            'bold, fontSize, weightedFontFamily',
-        ]
-        return [
-            {
-                'updateTextStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex': len(item['text']) + 1
-                    },
-                    'textStyle': formatting[0],
-                    'fields': formatting[1]
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': item['text'] + newline + newline
-                }
-            }
-        ]
-    elif item['type'] == 'request':
-        text = 'Input requested from ' + item['text']
-        formatting = [
-            {
-                'bold': False,
-                'fontSize': {
-                    'magnitude': 12,
-                    'unit': 'PT',
-                },
-                'weightedFontFamily': {
-                    'fontFamily': 'Roboto',
-                }
-            },
-            'bold, fontSize, weightedFontFamily',
-        ]
-        return [
-            {
-                'updateTextStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex': len(text) + 1
-                    },
-                    'textStyle': formatting[0],
-                    'fields': formatting[1]
-                }
-            },
-            {
-                'updateParagraphStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex':  len(text) + 1
-                    },
-                    'paragraphStyle': {
-                        'namedStyleType': 'NORMAL_TEXT',
-                    },
-                    'fields': 'namedStyleType'
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': text + newline
-                }
-            }
-        ]
-    elif item['type'] == 'emoji':
-        text = item['text']
-        for name in item['data']:
-            text += name + ', '
-        formatting = [
-            {
-                'bold': False,
-                'fontSize': {
-                    'magnitude': 12,
-                    'unit': 'PT',
-                },
-                'weightedFontFamily': {
-                    'fontFamily': 'Roboto',
-                }
-            },
-            'bold, fontSize, weightedFontFamily',
-        ]
-        return [
-            {
-                'updateParagraphStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex':  len(text) + 1
-                    },
-                    'paragraphStyle': {
-                        'namedStyleType': 'NORMAL_TEXT',
-                    },
-                    'fields': 'namedStyleType'
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': text + newline
-                }
-            }
-        ]
-    else:
-        formatting = [
-            {
-                'bold': False,
-                'fontSize': {
-                    'magnitude': 12,
-                    'unit': 'PT',
-                },
-                'weightedFontFamily': {
-                    'fontFamily': 'Roboto',
-                }
-            },
-            'bold, fontSize, weightedFontFamily',
-        ]
-        return [
-            {
-                'updateParagraphStyle': {
-                    'range': {
-                        'startIndex': 1,
-                        'endIndex':  len(item['text']) + 1
-                    },
-                    'paragraphStyle': {
-                        'namedStyleType': 'NORMAL_TEXT',
-                    },
-                    'fields': 'namedStyleType'
-                }
-            },
-            {
-                'insertText': {
-                    'location': {
-                        'index': 1,
-                    },
-                    'text': item['text'] + newline
-                }
-            }
-        ]
-
-
-def translate_from_doc(item, paragraph):
-    text_run = item.get('textRun')
-    text = text_run.get('content') if text_run else ''
-
-    text_type = ''
-    data = []
-
-    if text.startswith(("[ ]", "[X]")):
-      text_type = 'check'
-      text = text[:3]
-    elif paragraph.get('paragraphStyle').get('namedStyleType') == 'HEADING_1':
-      text_type = 'h1'
-    elif paragraph.get('paragraphStyle').get('namedStyleType') == 'HEADING_2':
-      text_type = 'h2'
-    elif text.startswith("Input requested from "):
-      text_type = 'request'
-    elif text.startswith(tuple(UNICODE_EMOJI['en'].keys())):
-      text_type = 'emoji'
-      data = text[1:]
-      text = text[:1]
-    else:
-      text_type = 'text'
-
-    return {'text': text, 'type': text_type, 'data': data}
 
 @app.route("/github/read", methods=["POST"])
 def read_from_github():
