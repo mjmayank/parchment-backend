@@ -636,26 +636,39 @@ def read_from_github():
   if not github_token:
     return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 500
   GITHUB_URL = 'https://api.github.com'
+  pulls = []
+  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner='DefinitelyTyped', repo=repo)
+  r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
+  for pr in r.json():
+    pulls.append([pr.get('title'), pr.get('number'), pr.get('user').get('login')])
   users = []
-  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner='mjmayank1', repo=repo, pull_number=1)
-  r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
-  app.logger.info(url)
-  app.logger.info(r.json())
-  for reviewer in r.json():
-    if reviewer:
-      app.logger.info(reviewer)
-      users.append(reviewer.get('user').get('login'))
-  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner='mjmayank1', repo=repo, pull_number=1)
-  r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
-  for reviewer in r.json().get('users'):
-    if reviewer:
-      users.append(reviewer.get('login'))
+  for pr in pulls:
+    data = [pr[0], [pr[2]]]
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner='DefinitelyTyped', repo=repo, pull_number=pr[1])
+    r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
+    app.logger.info(url)
+    app.logger.info(r.json())
+    for reviewer in r.json():
+      if reviewer:
+        app.logger.info(reviewer)
+        data[1].append(reviewer.get('user').get('login'))
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner='DefinitelyTyped', repo=repo, pull_number=pr[1])
+    r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
+    for reviewer in r.json().get('users'):
+      if reviewer:
+        data[1].append(reviewer.get('login'))
+    users.append(data)
   document_data = []
-  for user in users:
+  for data in users:
     document_data.append({
-      'type': 'p',
-      'text': user,
+      'type': 'h2',
+      'text': data[0],
     })
+    for user in data[1]:
+      document_data.append({
+        'type': 'p',
+        'text': user,
+      })
   requests.post('http://localhost:5000/document/create', json={
     'idToken': google_token,
     'documentId': document_id,
