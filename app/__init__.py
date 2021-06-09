@@ -291,7 +291,7 @@ def generate_doc():
   token = request.json.get('idToken')
   if not token:
     return 'No token sent', 500
-  document_data = request.json['documentData']
+  document_data = request.json.get('documentData')
   document_id = request.json.get('documentId')
   document_title = request.json.get('title')
   if not document_id:
@@ -310,11 +310,26 @@ def generate_doc():
   }
   creds = Credentials.from_authorized_user_info(creds_info)
   service = build('docs', 'v1', credentials=creds)
+
+  # Retrieve the documents contents from the Docs service.
+  document = service.documents().get(documentId=document_id).execute()
+
+  end_index = document.get('body').get('content')[-1].get('endIndex')
   requests = []
 
   for item in document_data:
       docs_item = translate_to_doc(item)
       requests += docs_item
+
+  if end_index > 2:
+    requests += [{
+      'deleteContentRange': {
+        'range': {
+          'startIndex': 1,
+          'endIndex': document.get('body').get('content')[-1].get('endIndex')-1,
+        }
+      }
+    }]
 
   result = service.documents().batchUpdate(
       documentId=document_id, body={'requests': requests[::-1]}).execute()
