@@ -375,7 +375,9 @@ def sync_from_doc():
     if 'paragraph' in value:
       elements = value.get('paragraph').get('elements')
       for elem in elements:
-        document_data.append(translate_from_doc(elem, value.get('paragraph')))
+        translated_value = translate_from_doc(elem, value.get('paragraph'))
+        if translated_value:
+          document_data.append(translated_value)
   return { 
     'title': doc_title,
     'body': document_data,

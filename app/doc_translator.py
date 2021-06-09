@@ -214,6 +214,9 @@ def translate_from_doc(item, paragraph):
     text_type = ''
     data = []
 
+    if text == '\n':
+        return
+
     if text.startswith(("[ ]", "[X]")):
       text_type = 'check'
       text = text[:3]
