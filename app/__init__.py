@@ -72,6 +72,14 @@ def home_view():
   db.create_all()
   return "<h1>Welcome to Parchment</h1>"
 
+@app.route("/delete")
+def home_view():
+  email = request.args.get('email')
+  user = User.query.filter_by(email=email).first()
+  db.session.delete(user)
+  db.session.commit()
+  return "Successfully deleted user: " + email
+
 @app.route("/test")
 def test_view():
   email = request.args.get('email')
