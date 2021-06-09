@@ -11,7 +11,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
 from flask_sqlalchemy import SQLAlchemy
-from emoji import UNICODE_EMOJI
 import json
 import requests
 from app.doc_translator import translate_from_doc, translate_to_doc
@@ -294,6 +293,7 @@ def generate_doc():
     return 'No token sent', 500
   document_data = request.json['documentData']
   document_id = request.json.get('documentId')
+  document_title = request.json.get('title')
   if not document_id:
     document_id = DOCUMENT_ID
     app.logger.warn('No document ID provided. Using default document.')
@@ -308,13 +308,8 @@ def generate_doc():
     'client_id': CLIENT_ID,
     'token_uri': 'https://oauth2.googleapis.com/token',
   }
-  creds = None
   creds = Credentials.from_authorized_user_info(creds_info)
   service = build('docs', 'v1', credentials=creds)
-
-  # Retrieve the documents contents from the Docs service.
-  document = service.documents().get(documentId=document_id).execute()
-
   requests = []
 
   for item in document_data:
@@ -323,6 +318,9 @@ def generate_doc():
 
   result = service.documents().batchUpdate(
       documentId=document_id, body={'requests': requests[::-1]}).execute()
+
+  drive_service = build('drive', 'v3', credentials=creds)
+  drive_service.files().update(fileId=document_id, body={'name': document_title}, fields='name').execute()
 
   return creds.to_json()
 

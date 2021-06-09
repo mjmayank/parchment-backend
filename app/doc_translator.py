@@ -1,3 +1,5 @@
+from emoji import UNICODE_EMOJI
+
 def translate_to_doc(item):
     newline = '\n'
     if item['type'] == 'check':
