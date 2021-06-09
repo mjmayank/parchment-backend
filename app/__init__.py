@@ -1,5 +1,5 @@
 from __future__ import print_function
-from flask import Flask, request, redirect, url_for, session, jsonify
+from flask import Flask, request, redirect, url_for, session, jsonify, render_template
 from flask_cors import CORS
 import os
 from sendgrid import SendGridAPIClient
@@ -69,6 +69,10 @@ def get_user_info(creds):
 
 @app.route("/")
 def home_view():
+  return render_template("index.html")
+
+@app.route("/db")
+def db_create():
   db.create_all()
   return "<h1>Welcome to Parchment</h1>"
 
