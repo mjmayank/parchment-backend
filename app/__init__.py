@@ -73,7 +73,7 @@ def home_view():
   return "<h1>Welcome to Parchment</h1>"
 
 @app.route("/delete")
-def home_view():
+def delete():
   email = request.args.get('email')
   user = User.query.filter_by(email=email).first()
   db.session.delete(user)
