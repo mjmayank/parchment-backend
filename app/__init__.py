@@ -14,6 +14,7 @@ from flask_sqlalchemy import SQLAlchemy
 import json
 import requests
 from app.doc_translator import translate_from_doc, translate_to_doc
+from urllib.parse import urlparse
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
@@ -233,9 +234,9 @@ def sign_in():
       else:
           flow = Flow.from_client_secrets_file(
               'credentials.json', SCOPES)
-          flow.redirect_uri = ('https://limitless-sierra-24357.herokuapp.com/document3'
+          flow.redirect_uri = ('https://api.speckdoc.com/signin/success'
             if not os.environ.get('FLASK_ENV') == 'development'
-            else 'http://localhost:5000/document3')
+            else 'http://localhost:5000/signin/success')
           # Generate URL for request to Google's OAuth 2.0 server.
           # Use kwargs to set optional request parameters.
           authorization_url, _ = flow.authorization_url(
@@ -249,7 +250,7 @@ def sign_in():
           return redirect(authorization_url)
           # creds = flow.run_local_server(port=8000)
 
-@app.route("/document3", methods=["GET"])
+@app.route("/signin/success", methods=["GET"])
 def create_doc():
   flow = Flow.from_client_secrets_file(
       'credentials.json',
@@ -397,12 +398,20 @@ def sync_from_doc():
 
 @app.route("/github/read", methods=["POST"])
 def read_from_github():
-  repo = request.args.get('repo')
+  repo_url = request.json.get('repo')
+  parsed_repo_url = urlparse(repo_url)
+  app.logger.info(parsed_repo_url)
+  GITHUB_URL = 'https://api.github.com'
+  app.logger.info(parsed_repo_url.netloc in ['www.github.com', 'github.com'])
+  if not parsed_repo_url.netloc in ['www.github.com', 'github.com']:
+    GITHUB_URL = 'https://' + parsed_repo_url.netloc + '/api/v3'
+  split_path = parsed_repo_url.path.split('/')
+  app.logger.info(split_path)
+  owner = split_path[1]
+  repo = split_path[2]
   google_token = None
-  document_id = None
   if request.json:
     google_token = request.json.get('idToken')
-    document_id = request.json.get('documentId')
   github_token = None
   if os.environ.get('FLASK_ENV') == 'development':
     github_token = os.environ.get('GITHUB_OAUTH')
@@ -415,28 +424,26 @@ def read_from_github():
     github_token = user.github_token or os.environ.get('GITHUB_OAUTH')
   if not github_token:
     return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 500
-  GITHUB_URL = 'https://api.github.com'
   pulls = []
-  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner='DefinitelyTyped', repo=repo)
+  app.logger.info(owner, repo)
+  url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo)
   r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
   for pr in r.json():
     pulls.append([pr.get('title'), pr.get('number'), pr.get('user').get('login')])
   users = []
   for pr in pulls:
     data = [pr[0], [pr[2]]]
-    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner='DefinitelyTyped', repo=repo, pull_number=pr[1])
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner=owner, repo=repo, pull_number=pr[1])
     r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
-    app.logger.info(url)
-    app.logger.info(r.json())
     for reviewer in r.json():
       if reviewer:
-        app.logger.info(reviewer)
         data[1].append(reviewer.get('user').get('login'))
-    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner='DefinitelyTyped', repo=repo, pull_number=pr[1])
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner=owner, repo=repo, pull_number=pr[1])
     r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
     for reviewer in r.json().get('users'):
       if reviewer:
         data[1].append(reviewer.get('login'))
+    data[1] = list(dict.fromkeys(data[1]))
     users.append(data)
   document_data = []
   for data in users:
@@ -449,12 +456,7 @@ def read_from_github():
         'type': 'p',
         'text': user,
       })
-  requests.post('http://localhost:5000/document/create', json={
-    'idToken': google_token,
-    'documentId': document_id,
-    'documentData': document_data,
-  })
-  return { 'data': users }
+  return { 'data': document_data }
 
 @app.route("/github/sync", methods=["POST"])
 def sync_github():
