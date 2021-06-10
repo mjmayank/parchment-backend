@@ -421,7 +421,7 @@ def read_from_github():
     idinfo = id_token.verify_oauth2_token(google_token, Request(), CLIENT_ID)
     email = idinfo['email']
     user = User.query.filter_by(email=email).first()
-    github_token = user.github_token or os.environ.get('GITHUB_OAUTH')
+    github_token = user.github_oauth_token or os.environ.get('GITHUB_OAUTH')
   if not github_token:
     return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 500
   pulls = []
