@@ -423,7 +423,7 @@ def read_from_github():
     user = User.query.filter_by(email=email).first()
     github_token = user.github_oauth_token or os.environ.get('GITHUB_OAUTH')
   if not github_token:
-    return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 500
+    return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 403
   pulls = []
   app.logger.info(owner, repo)
   url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo)
@@ -467,7 +467,7 @@ def sync_github():
   idinfo = id_token.verify_oauth2_token(google_token, Request(), CLIENT_ID)
   email = idinfo['email']
   user = User.query.filter_by(email=email).first()
-  user.github_token = github_token
+  user.github_oauth_token = github_token
   db.session.add(user)
   db.session.commit()
   return "Github token saved successfully", 200
