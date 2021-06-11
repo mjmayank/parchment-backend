@@ -44,9 +44,7 @@ SCOPES = [
 CLIENT_ID = ("73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
   if not os.environ.get('FLASK_ENV') == 'development'
   else "73937624438-ivv2g6bb7gsp0c4tq0nku5vj9u0t42uu.apps.googleusercontent.com")
-CLIENT_SECRET = ('-K5PjHqNEc-aKLRVj0JiNG0y'
-  if not os.environ.get('FLASK_ENV') == 'development'
-  else "hjSXDpMfx1hNeNkJPnNCvy19")
+CLIENT_SECRET = os.environ.get('GOOGLE_SECRET')
 
 DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo' if not os.environ.get('DOCUMENT_ID') else os.environ.get('DOCUMENT_ID')
 
