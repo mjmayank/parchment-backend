@@ -1,4 +1,5 @@
 from __future__ import print_function
+from posix import environ
 from flask import Flask, request, redirect, url_for, session, jsonify, render_template
 from flask_cors import CORS
 import os
@@ -28,6 +29,10 @@ ROOT_DOMAIN = ('https://limitless-sierra-24357.herokuapp.com'
   if not os.environ.get('FLASK_ENV') == 'development'
   else 'http://localhost:5000')
 
+credentials_json = ('client_secret_prod.json'
+  if not os.environ.get('FLASK_ENV') == 'development'
+  else 'client_secret_dev.json')
+
 cors = CORS(app)
 db = SQLAlchemy(app)
 
@@ -36,7 +41,13 @@ SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/drive',
 ]
-CLIENT_ID = "73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
+CLIENT_ID = ("73937624438-b70smv6ui0j29m29akdjv3vg36oh0htf.apps.googleusercontent.com"
+  if not os.environ.get('FLASK_ENV') == 'development'
+  else "73937624438-ivv2g6bb7gsp0c4tq0nku5vj9u0t42uu.apps.googleusercontent.com")
+CLIENT_SECRET = ('-K5PjHqNEc-aKLRVj0JiNG0y'
+  if not os.environ.get('FLASK_ENV') == 'development'
+  else "hjSXDpMfx1hNeNkJPnNCvy19")
+
 DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo' if not os.environ.get('DOCUMENT_ID') else os.environ.get('DOCUMENT_ID')
 
 class User(db.Model):
@@ -205,7 +216,7 @@ def create_new_document():
     'refresh_token': user.refresh_token,
     'token': user.access_token,
     'expiry': user.expiry.replace(' ', 'T'),
-    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_secret': CLIENT_SECRET,
     'client_id': CLIENT_ID,
     'token_uri': 'https://oauth2.googleapis.com/token',
   }
@@ -233,7 +244,7 @@ def sign_in():
           creds.refresh(Request())
       else:
           flow = Flow.from_client_secrets_file(
-              'credentials.json', SCOPES)
+              credentials_json, SCOPES)
           flow.redirect_uri = ('https://api.speckdoc.com/signin/success'
             if not os.environ.get('FLASK_ENV') == 'development'
             else 'http://localhost:5000/signin/success')
@@ -253,7 +264,7 @@ def sign_in():
 @app.route("/signin/success", methods=["GET"])
 def create_doc():
   flow = Flow.from_client_secrets_file(
-      'credentials.json',
+      credentials_json,
       scopes=SCOPES)
   flow.redirect_uri = url_for('create_doc', _external=True)
   app.logger.info('redirecturi', flow.redirect_uri)
@@ -277,12 +288,10 @@ def create_doc():
   email = get_user_info(creds)
   user = User.query.filter_by(email=email).first()
   if user:
-    if not user.refresh_token:
-      user.token=creds.token
-      user.refresh_token=creds.refresh_token
-      user.expiry=creds.expiry
-      db.session.add(user)
-      db.session.commit()
+    user.token=creds.token
+    user.refresh_token=creds.refresh_token
+    user.expiry=creds.expiry
+    db.session.commit()
   else:
     user = User(
       email=email,
@@ -292,11 +301,12 @@ def create_doc():
     )
     db.session.add(user)
     db.session.commit()
-  if (user.refresh_token):
+  if (os.environ.get('FLASK_ENV') != 'development' and user.refresh_token):
     return 'You can close this tab'
   return jsonify({
     'email': user.email,
-    'refresh_token': user.refresh_token
+    'refresh_token': user.refresh_token,
+    'client_id': creds.client_id,
   })
 
 @app.route("/document/create", methods=["POST"])
@@ -317,7 +327,7 @@ def generate_doc():
     'refresh_token': user.refresh_token,
     'token': user.access_token,
     'expiry': user.expiry.replace(' ', 'T'),
-    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_secret': CLIENT_SECRET,
     'client_id': CLIENT_ID,
     'token_uri': 'https://oauth2.googleapis.com/token',
   }
@@ -370,7 +380,7 @@ def sync_from_doc():
     'refresh_token': user.refresh_token,
     'token': user.access_token,
     'expiry': user.expiry.replace(' ', 'T'),
-    'client_secret': '-K5PjHqNEc-aKLRVj0JiNG0y',
+    'client_secret': CLIENT_SECRET,
     'client_id': CLIENT_ID,
     'token_uri': 'https://oauth2.googleapis.com/token',
   }
@@ -423,9 +433,12 @@ def read_from_github():
     user = User.query.filter_by(email=email).first()
     github_token = user.github_oauth_token or os.environ.get('GITHUB_OAUTH')
   if not github_token:
-    return "Not authed with github yet. Add to request (prod) or as env variable (dev only)", 403
+    return {
+      'data': '/github-add_auth [replace this with your github token]',
+    }, 403
   pulls = []
-  app.logger.info(owner, repo)
+  app.logger.info(owner)
+  app.logger.info(repo)
   url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo)
   r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
   for pr in r.json():
