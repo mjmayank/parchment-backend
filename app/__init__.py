@@ -1,5 +1,4 @@
 from __future__ import print_function
-from posix import environ
 from flask import Flask, request, redirect, url_for, session, jsonify, render_template
 from flask_cors import CORS
 import os
@@ -7,12 +6,11 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 import os.path
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow, Flow
+from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
 from flask_sqlalchemy import SQLAlchemy
-import json
 import requests
 from app.doc_translator import translate_from_doc, translate_to_doc
 from urllib.parse import urlparse
