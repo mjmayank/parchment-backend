@@ -10,10 +10,11 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
-from flask_sqlalchemy import SQLAlchemy
 import requests
 from app.doc_translator import translate_from_doc, translate_to_doc
+from app.google_helper import get_drive_service
 from urllib.parse import urlparse
+from unidiff import PatchSet
 
 app = Flask(__name__)
 app.secret_key = 'the random string'
@@ -22,6 +23,9 @@ SQLALCHEMY_DATABASE_URI = (os.environ.get('DATABASE_URL').replace("://", "ql://"
   else os.environ.get('DATABASE_URL'))
 app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+# Needs to be after the app has been initialized
+from app.models import db
 
 ROOT_DOMAIN = ('https://limitless-sierra-24357.herokuapp.com'
   if not os.environ.get('FLASK_ENV') == 'development'
@@ -32,7 +36,6 @@ credentials_json = ('client_secret_prod.json'
   else 'client_secret_dev.json')
 
 cors = CORS(app)
-db = SQLAlchemy(app)
 
 SCOPES = [
   'https://www.googleapis.com/auth/documents',
@@ -46,15 +49,6 @@ CLIENT_SECRET = os.environ.get('GOOGLE_SECRET')
 
 DOCUMENT_ID = '1M3erMHjZqOhPhs_SnrceyZK4KqqBarFaxhFlQ0vdKGo' if not os.environ.get('DOCUMENT_ID') else os.environ.get('DOCUMENT_ID')
 
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String, unique=True, nullable=False)
-    token = db.Column(db.String, unique=False, nullable=True)
-    refresh_token = db.Column(db.String, unique=False, nullable=True)
-    expiry = db.Column(db.String, unique=False, nullable=True)
-    access_token = db.Column(db.String, unique=False, nullable=True)
-    github_oauth_token = db.Column(db.String, unique=False, nullable=True)
-    
 
 def get_user_info(creds):
   """Send a request to the UserInfo API to retrieve the user's information.
@@ -404,6 +398,7 @@ def sync_from_doc():
 
 @app.route("/github/read", methods=["POST"])
 def read_from_github():
+  token = request.json.get('idToken')
   repo_url = request.json.get('repo')
   parsed_repo_url = urlparse(repo_url)
   app.logger.info(parsed_repo_url)
@@ -430,7 +425,7 @@ def read_from_github():
     github_token = user.github_oauth_token or os.environ.get('GITHUB_OAUTH')
   if not github_token:
     return {
-      'data': '/github-add_auth [replace this with your github token]',
+      'error': '/github-add_auth [replace this with your github token]',
     }, 403
   pulls = []
   app.logger.info(owner)
@@ -438,29 +433,60 @@ def read_from_github():
   url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo)
   r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
   for pr in r.json():
-    pulls.append([pr.get('title'), pr.get('number'), pr.get('user').get('login')])
+    pulls.append({
+      'title': pr.get('title'),
+      'diff_url': pr.get('diff_url'),
+      'number': pr.get('number'),
+      'username': pr.get('user').get('login'),
+    })
+  if len(pulls) > 6:
+    return 'error', 405
   users = []
   for pr in pulls:
-    data = [pr[0], [pr[2]]]
-    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner=owner, repo=repo, pull_number=pr[1])
+    data = {
+      'title': pr.get('title'),
+      'users': [pr.get('username')],
+    }
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}'.format(owner=owner, repo=repo, pull_number=pr['number'])
+    r = requests.get(
+      url,
+      headers={
+        'Authorization': 'token {token}'.format(token=github_token),
+        'Accept': 'application/vnd.github.diff',
+      }
+    )
+    app.logger.info(r.headers)
+    patch = PatchSet(r.text)
+    data['g_doc'] = str(patch[0][0]).split('@@')[2][2:]
+    file_id = urlparse(data['g_doc']).path.split('/')[3]
+    app.logger.info(file_id)
+    comments = get_drive_service(token).comments().list(fileId=file_id, fields='comments/author/displayName').execute()
+    app.logger.info(comments)
+    for comment in comments.get('comments'):
+      data['users'].append(comment.get('author').get('displayName'))
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/reviews'.format(owner=owner, repo=repo, pull_number=pr['number'])
     r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
     for reviewer in r.json():
       if reviewer:
-        data[1].append(reviewer.get('user').get('login'))
-    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner=owner, repo=repo, pull_number=pr[1])
+        data['users'].append(reviewer.get('user').get('login'))
+    url = GITHUB_URL + '/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers'.format(owner=owner, repo=repo, pull_number=pr['number'])
     r = requests.get(url, headers={'Authorization': 'token {token}'.format(token=github_token)})
     for reviewer in r.json().get('users'):
       if reviewer:
-        data[1].append(reviewer.get('login'))
-    data[1] = list(dict.fromkeys(data[1]))
+        data['users'].append(reviewer.get('login'))
+    data['users'] = list(dict.fromkeys(data['users']))
     users.append(data)
   document_data = []
   for data in users:
     document_data.append({
       'type': 'h2',
-      'text': data[0],
+      'text': data['title'],
     })
-    for user in data[1]:
+    document_data.append({
+      'type': 'h2',
+      'text': data['g_doc'],
+    })
+    for user in data['users']:
       document_data.append({
         'type': 'p',
         'text': user,
