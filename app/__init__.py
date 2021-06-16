@@ -10,10 +10,7 @@ from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
-import requests
 from app.doc_translator import translate_from_doc, translate_to_doc
-from urllib.parse import urlparse
-from unidiff import PatchSet
 from app.models import db, User
 from app.google_helper import get_drive_service
 from app.constants import CLIENT_ID, CLIENT_SECRET, SCOPES, credentials_json, DOCUMENT_ID
