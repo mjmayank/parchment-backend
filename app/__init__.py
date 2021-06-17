@@ -89,7 +89,7 @@ def test_view():
 def send_review_request():
   email = request.args.get('email')
   message = Mail(
-      from_email='mjmayank@gmail.com',
+      from_email='no-reply@straightshotvideo.com',
       to_emails=email)
   message.template_id = 'd-fe954c63b4b6489dab6074dde908b216'
   try:
@@ -103,7 +103,7 @@ def send_review_request():
 def send_reminder_request():
   email = request.args.get('email')
   message = Mail(
-      from_email='mjmayank@gmail.com',
+      from_email='no-reply@straightshotvideo.com',
       to_emails=email)
   message.template_id = 'd-b0830da153e44dfc804cd1b33622dd59'
   try:
@@ -117,7 +117,7 @@ def send_reminder_request():
 def send_premeeting():
   email = request.args.get('email')
   message = Mail(
-      from_email='mjmayank@gmail.com',
+      from_email='no-reply@straightshotvideo.com',
       to_emails=email)
   message.template_id = 'd-1ed6ddbaacb54c0fa15841f52b02b890'
   try:
@@ -131,7 +131,7 @@ def send_premeeting():
 def send_postmeeting():
   email = request.args.get('email')
   message = Mail(
-      from_email='mjmayank@gmail.com',
+      from_email='no-reply@straightshotvideo.com',
       to_emails=email)
   message.template_id = 'd-75860aa6fd8b4535b88d4aa5146bf7fe'
   try:
@@ -386,10 +386,7 @@ def read_from_github():
   pulls = []
   url = GITHUB_URL + '/repos/{owner}/{repo}/pulls'.format(owner=owner, repo=repo)
   github_token = get_github_token(google_token)
-  app.logger.info(github_token)
-  app.logger.info(url)
   r = github_request(url, github_token)
-  app.logger.info(r)
   for pr in r.json():
     pulls.append({
       'title': pr.get('title'),
@@ -428,12 +425,9 @@ def read_from_github():
   document_data = []
   for data in users:
     document_data.append({
-      'type': 'h2',
+      'type': 'link',
       'text': data['title'],
-    })
-    document_data.append({
-      'type': 'h2',
-      'text': data['g_doc'],
+      'data': data['g_doc'],
     })
     for user in data['users']:
       document_data.append({
