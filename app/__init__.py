@@ -89,7 +89,7 @@ def test_view():
 def send_review_request():
   email = request.args.get('email')
   message = Mail(
-      from_email='no-reply@straightshotvideo.com',
+      from_email=('no-reply@straightshotvideo.com', 'Straightshot'),
       to_emails=email)
   message.template_id = 'd-fe954c63b4b6489dab6074dde908b216'
   try:
@@ -103,7 +103,7 @@ def send_review_request():
 def send_reminder_request():
   email = request.args.get('email')
   message = Mail(
-      from_email='no-reply@straightshotvideo.com',
+      from_email=('no-reply@straightshotvideo.com', 'Straightshot'),
       to_emails=email)
   message.template_id = 'd-b0830da153e44dfc804cd1b33622dd59'
   try:
@@ -117,7 +117,7 @@ def send_reminder_request():
 def send_premeeting():
   email = request.args.get('email')
   message = Mail(
-      from_email='no-reply@straightshotvideo.com',
+      from_email=('no-reply@straightshotvideo.com', 'Straightshot'),
       to_emails=email)
   message.template_id = 'd-1ed6ddbaacb54c0fa15841f52b02b890'
   try:
@@ -131,7 +131,7 @@ def send_premeeting():
 def send_postmeeting():
   email = request.args.get('email')
   message = Mail(
-      from_email='no-reply@straightshotvideo.com',
+      from_email=('no-reply@straightshotvideo.com', 'Straightshot'),
       to_emails=email)
   message.template_id = 'd-75860aa6fd8b4535b88d4aa5146bf7fe'
   try:
