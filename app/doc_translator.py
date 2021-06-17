@@ -170,6 +170,57 @@ def translate_to_doc(item):
                 }
             }
         ]
+    elif item['type'] == 'link':
+        text = item['text']
+        formatting = [
+            {
+                'bold': False,
+                'fontSize': {
+                    'magnitude': 12,
+                    'unit': 'PT',
+                },
+                'weightedFontFamily': {
+                    'fontFamily': 'Roboto',
+                }
+            },
+            'bold, fontSize, weightedFontFamily',
+        ]
+        return [
+            {
+                'updateParagraphStyle': {
+                    'range': {
+                        'startIndex': 1,
+                        'endIndex':  len(item['text']) + 1
+                    },
+                    'paragraphStyle': {
+                        'namedStyleType': 'NORMAL_TEXT',
+                    },
+                    'fields': 'namedStyleType'
+                }
+            },
+            {
+                'updateTextStyle': {
+                    'range': {
+                        'startIndex': 1,
+                        'endIndex': len(item['text']) + 1
+                    },
+                    'textStyle': {
+                        'link': {
+                            'url': item['data'],
+                        },
+                    },
+                    'fields': 'link',
+                }
+            },
+            {
+                'insertText': {
+                    'location': {
+                        'index': 1,
+                    },
+                    'text': item['text'] + newline
+                }
+            }
+        ]
     else:
         formatting = [
             {
